@@ -38,24 +38,18 @@ def senha_configurada():
     return configuracao("senha")
 
 
-@st.cache_resource
-def armazenamento():
+def credenciais_github():
     github = configuracao("github")
     if not github or not github.get("token") or not github.get("repositorio"):
         return None
-    return ArmazenamentoGitHub(github["token"], github["repositorio"], github.get("branch", "dados"))
+    return (str(github["token"]), str(github["repositorio"]), str(github.get("branch", "dados")))
 
 
 @st.cache_resource
-def preparar_armazenamento():
-    remoto = armazenamento()
-    if not remoto:
-        return {"ativo": False, "erro": None}
-    try:
-        remoto.testar()
-        remoto.sincronizar_para_local()
-    except Exception as erro:
-        return {"ativo": False, "erro": str(erro)}
+def _conectar_github(token, repositorio, branch):
+    remoto = ArmazenamentoGitHub(token, repositorio, branch)
+    remoto.testar()
+    remoto.sincronizar_para_local()
 
     def enviar_empresa(caminho):
         try:
@@ -64,8 +58,30 @@ def preparar_armazenamento():
         except Exception as erro:
             st.error(f"A empresa foi salva só temporariamente. Erro ao gravar no GitHub: {erro}")
 
+    modulo_empresa.AO_SALVAR.clear()
     modulo_empresa.AO_SALVAR.append(enviar_empresa)
-    return {"ativo": True, "erro": None}
+    return remoto
+
+
+def armazenamento():
+    credenciais = credenciais_github()
+    if not credenciais:
+        return None
+    try:
+        return _conectar_github(*credenciais)
+    except Exception:
+        return None
+
+
+def preparar_armazenamento():
+    credenciais = credenciais_github()
+    if not credenciais:
+        return {"ativo": False, "erro": None}
+    try:
+        _conectar_github(*credenciais)
+        return {"ativo": True, "erro": None}
+    except Exception as erro:
+        return {"ativo": False, "erro": str(erro)}
 
 
 def gravar_remoto(acao, *args, **kwargs):

@@ -28,11 +28,16 @@ def carregar_empresa(caminho):
         return json.load(f)
 
 
+AO_SALVAR = []
+
+
 def salvar_empresa(config, apelido):
     PASTA_EMPRESAS.mkdir(parents=True, exist_ok=True)
     caminho = PASTA_EMPRESAS / f"{apelido}.json"
     with open(caminho, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
+    for funcao in AO_SALVAR:
+        funcao(caminho)
     return caminho
 
 

@@ -3,13 +3,15 @@ import os
 import shutil
 import tempfile
 import zipfile
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 os.chdir(Path(__file__).resolve().parent)
 
 import streamlit as st
 
+from src import empresa as modulo_empresa
+from src.armazenamento_github import ArmazenamentoGitHub
 from src.empresa import (
     CAMPOS, PASTA_EMPRESAS, carregar_empresa, consultar_cnpj, identificar_empresa,
     listar_empresas, salvar_empresa,
@@ -19,6 +21,7 @@ from src.leitura_planilha import carregar_aba, detectar_aba, filtrar_linhas_vali
 from src.utils import formatar_cnpj, formatar_data, nome_arquivo_seguro, normalizar
 
 MODELO = Path("modelo/declaracao.docx")
+HORARIO_BRASILIA = timezone(timedelta(hours=-3))
 NAO_USAR = "(não usar)"
 
 st.set_page_config(page_title="Declarações de Encerramento", page_icon="📄", layout="wide")
@@ -33,6 +36,48 @@ def configuracao(chave, padrao=None):
 
 def senha_configurada():
     return configuracao("senha")
+
+
+@st.cache_resource
+def armazenamento():
+    github = configuracao("github")
+    if not github or not github.get("token") or not github.get("repositorio"):
+        return None
+    return ArmazenamentoGitHub(github["token"], github["repositorio"], github.get("branch", "dados"))
+
+
+@st.cache_resource
+def preparar_armazenamento():
+    remoto = armazenamento()
+    if not remoto:
+        return {"ativo": False, "erro": None}
+    try:
+        remoto.testar()
+        remoto.sincronizar_para_local()
+    except Exception as erro:
+        return {"ativo": False, "erro": str(erro)}
+
+    def enviar_empresa(caminho):
+        try:
+            nome = carregar_empresa(caminho).get("empresa", {}).get("nome", caminho.stem)
+            remoto.enviar(caminho, mensagem=f"Salva empresa: {nome}")
+        except Exception as erro:
+            st.error(f"A empresa foi salva só temporariamente. Erro ao gravar no GitHub: {erro}")
+
+    modulo_empresa.AO_SALVAR.append(enviar_empresa)
+    return {"ativo": True, "erro": None}
+
+
+def gravar_remoto(acao, *args, **kwargs):
+    remoto = armazenamento()
+    if not remoto or not preparar_armazenamento()["ativo"]:
+        return True
+    try:
+        getattr(remoto, acao)(*args, **kwargs)
+        return True
+    except Exception as erro:
+        st.error(f"A alteração vale só até o site reiniciar. Erro ao gravar no GitHub: {erro}")
+        return False
 
 
 def exigir_login():
@@ -191,7 +236,7 @@ def pagina_gerar():
 
     if st.button("Gerar declarações", type="primary", disabled=not liberado, width="stretch"):
         data_texto = formatar_data(data_escolhida, extenso=formato != "21/09/2026")
-        carimbo = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        carimbo = datetime.now(HORARIO_BRASILIA).strftime("%Y-%m-%d_%H%M%S")
         nome_pasta = f"{nome_arquivo_seguro(Path(arquivo.name).stem)}_{carimbo}"
         if configuracao("guardar_copia", True):
             pasta = Path("Saida") / escolhida.stem / nome_pasta
@@ -202,6 +247,7 @@ def pagina_gerar():
         gerados, avisos = gerar(
             dados, mapa, config, MODELO, pasta, data_texto, linha_cab,
             ao_progredir=lambda n, total, nome: barra.progress(n / total, text=f"{n}/{total} · {nome}"),
+            nome_planilha=arquivo.name,
         )
         if com_pdf:
             barra.progress(1.0, text="Convertendo para PDF (pode levar alguns minutos)...")
@@ -209,8 +255,10 @@ def pagina_gerar():
             converter_pasta(pasta, pasta / "PDF")
         barra.empty()
 
-        config["colunas"] = {k: v for k, v in mapa.items() if v}
-        salvar_empresa(config, escolhida.stem)
+        colunas_usadas = {k: v for k, v in mapa.items() if v}
+        if config.get("colunas") != colunas_usadas:
+            config["colunas"] = colunas_usadas
+            salvar_empresa(config, escolhida.stem)
 
         st.session_state.resultado = {
             "zip": compactar(pasta),
@@ -274,6 +322,8 @@ def pagina_empresas():
                 if st.checkbox("Confirmo que quero excluir", key=f"del_{escolhida.stem}"):
                     if st.button("Excluir", type="secondary"):
                         escolhida.unlink()
+                        gravar_remoto("excluir", escolhida,
+                                      mensagem=f"Exclui empresa: {escolhida.stem}")
                         st.rerun()
 
     with aba_nova:
@@ -341,13 +391,23 @@ Para mudar o texto: baixe o modelo, edite no Word **mantendo os marcadores** ent
         backup.mkdir(exist_ok=True)
         shutil.copy(MODELO, backup / f"declaracao_{datetime.now():%Y-%m-%d_%H%M%S}.docx")
         MODELO.write_bytes(novo.getvalue())
-        st.success("Modelo substituído. O anterior foi guardado em modelo/backup.")
+        if gravar_remoto("enviar", MODELO, mensagem=f"Substitui modelo ({novo.name})"):
+            if armazenamento():
+                st.success("Modelo substituído e salvo de forma permanente. "
+                           "As versões anteriores ficam no histórico do GitHub.")
+            else:
+                st.success("Modelo substituído. O anterior foi guardado em modelo/backup.")
 
 
 if exigir_login():
+    estado = preparar_armazenamento()
     with st.sidebar:
         st.header("Menu")
         pagina = st.radio("Ir para", ["Gerar declarações", "Empresas", "Modelo"], label_visibility="collapsed")
+        if estado["ativo"]:
+            st.caption("💾 Cadastros e modelo salvos de forma permanente.")
+        elif estado["erro"]:
+            st.error(f"Não consegui acessar o armazenamento permanente: {estado['erro']}")
         if senha_configurada() and st.button("Sair"):
             st.session_state.autenticado = False
             st.rerun()

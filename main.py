@@ -85,13 +85,13 @@ def processar_planilha(caminho_planilha, args, interativo=False):
 
     gerados, avisos = gerar(
         dados, mapa, config, args.modelo, pasta_saida, data_declaracao, linha_cab,
-        remover_destaque=not args.manter_destaque,
+        remover_destaque=not args.manter_destaque, nome_planilha=caminho_planilha.name,
     )
 
     print(f"\n {len(gerados)} declarações geradas em: {pasta_saida}")
     print(f" Data usada: {data_declaracao}")
     if avisos:
-        print(f"\n ATENÇÃO ({len(avisos)}), veja também avisos.txt:")
+        print(f"\n ATENÇÃO ({len(avisos)}), veja também Relatorio.xlsx:")
         for a in avisos:
             print(f"  - {a}")
 

@@ -24,7 +24,8 @@ Dê dois cliques em **INICIAR_PLATAFORMA.bat** (ou rode `python -m streamlit run
 3. **Modelo:** baixe, edite no Word e envie de volta o texto da declaração.
    O modelo anterior fica guardado em `modelo/backup`.
 
-Uma cópia de tudo que é gerado fica em `Saida/<empresa>/`.
+Junto das declarações vem o **Relatorio.xlsx**, com resumo, lista de tudo que
+foi gerado e as pendências. Uma cópia fica em `Saida/<empresa>/` (exceto na nuvem).
 
 ## Senha de acesso (opcional)
 
@@ -38,9 +39,15 @@ troque a senha dentro dele e reinicie a plataforma.
 3. Em Advanced settings > Secrets, cole o conteúdo de `.streamlit/secrets.toml.exemplo`
    com a senha trocada.
 
-Na nuvem, cadastros de empresas e trocas de modelo feitos pelo site podem se perder
-quando o app reinicia. Para torná-los permanentes, atualize os arquivos
-`config/empresas/*.json` e `modelo/declaracao.docx` no GitHub.
+### Cadastros permanentes
+
+Com a parte `[github]` configurada nos Secrets, empresas cadastradas/editadas e
+modelos enviados pelo site são gravados no ramo `dados` do repositório e
+voltam sozinhos quando o app reinicia. O histórico de cada alteração fica no GitHub.
+Sem essa configuração, as alterações feitas pelo site se perdem ao reiniciar.
+
+O token precisa ser do tipo fine-grained, com acesso só a este repositório
+e permissão **Contents: Read and write**.
 
 ## Uso pelo terminal (continua funcionando)
 

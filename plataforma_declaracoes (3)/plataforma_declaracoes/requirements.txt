@@ -1,5 +1,0 @@
-pandas
-openpyxl
-python-docx
-streamlit>=1.46
-requests

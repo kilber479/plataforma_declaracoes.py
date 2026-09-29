@@ -35,7 +35,8 @@ class ArmazenamentoGitHub:
         return "/".join(partes[:2]) if len(partes) >= 2 else texto
 
     def _url(self, caminho=""):
-        return f"{API}/repos/{self.repositorio}/{caminho}"
+        base = f"{API}/repos/{self.repositorio}"
+        return f"{base}/{caminho.lstrip('/')}" if caminho else base
 
     def _requisitar(self, metodo, caminho, **kwargs):
         resposta = self.sessao.request(metodo, self._url(caminho), timeout=30, **kwargs)

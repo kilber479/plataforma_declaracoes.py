@@ -20,7 +20,7 @@ from src.gerador import ROTULOS, conferir, gerar
 from src.leitura_planilha import carregar_aba, detectar_aba, filtrar_linhas_validas, mapear_colunas
 from src.utils import formatar_cnpj, formatar_data, nome_arquivo_seguro, normalizar
 
-VERSAO = "v3 (25/09)"
+VERSAO = "v4 (25/09)"
 MODELO = Path("modelo/declaracao.docx")
 HORARIO_BRASILIA = timezone(timedelta(hours=-3))
 NAO_USAR = "(não usar)"

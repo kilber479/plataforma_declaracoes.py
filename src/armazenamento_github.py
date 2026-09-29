@@ -66,12 +66,29 @@ class ArmazenamentoGitHub:
             )
         usuario = resposta.json().get("login", "?") if resposta.status_code < 400 else "?"
         if self._requisitar("GET", "") is None:
+            visiveis = self.repositorios_visiveis()
+            if visiveis:
+                lista = ", ".join(f"'{r}'" for r in visiveis[:10])
+                dica = (f" Esse token enxerga apenas: {lista}. Copie o nome certo dessa lista "
+                        "para o campo 'repositorio' nos Secrets, ou libere o repositório no token.")
+            else:
+                dica = (" Esse token não enxerga nenhum repositório: em 'Repository access' do token, "
+                        "escolha 'Only select repositories', selecione o repositório e clique em "
+                        "'Update' (ou gere um token novo).")
             raise ErroGitHub(
                 f"O token (do usuário '{usuario}') não enxerga o repositório "
-                f"'{self.repositorio}'. Confira se o nome está idêntico ao do endereço do "
-                "GitHub e se esse repositório está selecionado em 'Repository access' do token."
+                f"'{self.repositorio}'.{dica}"
             )
         return usuario
+
+    def repositorios_visiveis(self):
+        try:
+            resposta = self.sessao.get(f"{API}/user/repos", params={"per_page": 100}, timeout=30)
+            if resposta.status_code >= 400:
+                return []
+            return [r.get("full_name", "") for r in resposta.json()]
+        except Exception:
+            return []
 
     def garantir_branch(self):
         if self._requisitar("GET", f"git/ref/heads/{self.branch}"):

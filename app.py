@@ -20,6 +20,7 @@ from src.gerador import ROTULOS, conferir, gerar
 from src.leitura_planilha import carregar_aba, detectar_aba, filtrar_linhas_validas, mapear_colunas
 from src.utils import formatar_cnpj, formatar_data, nome_arquivo_seguro, normalizar
 
+VERSAO = "v3 (25/09)"
 MODELO = Path("modelo/declaracao.docx")
 HORARIO_BRASILIA = timezone(timedelta(hours=-3))
 NAO_USAR = "(não usar)"
@@ -424,6 +425,7 @@ if exigir_login():
             st.caption("💾 Cadastros e modelo salvos de forma permanente.")
         elif estado["erro"]:
             st.error(f"Não consegui acessar o armazenamento permanente: {estado['erro']}")
+        st.caption(f"Versão {VERSAO}")
         if senha_configurada() and st.button("Sair"):
             st.session_state.autenticado = False
             st.rerun()

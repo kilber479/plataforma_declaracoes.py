@@ -20,7 +20,7 @@ from src.gerador import ROTULOS, conferir, gerar
 from src.leitura_planilha import carregar_aba, detectar_aba, filtrar_linhas_validas, mapear_colunas
 from src.utils import formatar_cnpj, formatar_data, nome_arquivo_seguro, normalizar
 
-VERSAO = "v4 (25/09)"
+VERSAO = "v5 (02/10)"
 MODELO = Path("modelo/declaracao.docx")
 HORARIO_BRASILIA = timezone(timedelta(hours=-3))
 NAO_USAR = "(não usar)"
@@ -329,7 +329,7 @@ def pagina_empresas():
         else:
             escolhida = st.selectbox("Empresa", empresas, format_func=nome_empresa)
             config = carregar_empresa(escolhida)
-            with st.form(f"editar_{escolhida.stem}"):
+            with st.form(f"form_editar_{escolhida.stem}"):
                 valores = formulario_empresa(config.get("empresa", {}), f"ed_{escolhida.stem}")
                 if st.form_submit_button("Salvar alterações", type="primary"):
                     config["empresa"] = valores
@@ -353,14 +353,14 @@ def pagina_empresas():
                 encontrado = consultar_cnpj(cnpj)
             if encontrado:
                 encontrado["cidade_assinatura"] = encontrado.get("cidade", "")
-                st.session_state.nova_empresa = encontrado
+                st.session_state.dados_receita = encontrado
                 st.session_state.nova_versao = st.session_state.get("nova_versao", 0) + 1
                 st.success("Dados encontrados. Confira abaixo antes de salvar.")
             else:
                 st.error("Não foi possível consultar. Preencha os dados manualmente.")
 
-        base = st.session_state.get("nova_empresa", {"cnpj": formatar_cnpj(cnpj)})
-        with st.form("nova_empresa"):
+        base = st.session_state.get("dados_receita", {"cnpj": formatar_cnpj(cnpj)})
+        with st.form("form_nova_empresa"):
             valores = formulario_empresa(base, f"nova_{st.session_state.get('nova_versao', 0)}")
             if st.form_submit_button("Cadastrar empresa", type="primary"):
                 if not valores["nome"] or not valores["cnpj"]:
@@ -370,7 +370,8 @@ def pagina_empresas():
                     if (PASTA_EMPRESAS / f"{apelido}.json").exists():
                         apelido = f"{apelido}_{normalizar(valores['cnpj'])[:8]}"
                     salvar_empresa({"empresa": valores}, apelido)
-                    st.session_state.pop("nova_empresa", None)
+                    st.session_state.pop("dados_receita", None)
+                    st.session_state.nova_versao = st.session_state.get("nova_versao", 0) + 1
                     st.success(f"Empresa {valores['nome']} cadastrada.")
 
 
